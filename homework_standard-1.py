@@ -1,10 +1,6 @@
-#!/usr/bin/env python3
-# -*- coding=utf-8 -*-
-# 本脚由亁颐堂现任明教教主编写，用于乾颐盾Python课程！
-# 教主QQ:605658506
-# 亁颐堂官网www.qytang.com
-# 教主技术进化论拓展你的技术新边疆
-# https://ke.qq.com/course/271956?tuin=24199d8a
+
+
+
 
 
 import logging
@@ -14,7 +10,6 @@ import re
 from dateutil import parser
 import os
 import sqlite3
-from monitor_ospf_state import snmp_trap_receiver
 from datetime import datetime
 
 # facility与ID的对应关系的字典
@@ -50,10 +45,14 @@ severity_level_dict = {0: 'EMERG',
                        7: 'DEBUG'}
 
 
-
 class SyslogUDPHandler(socketserver.BaseRequestHandler):
     def handle(self):
         data = bytes.decode(self.request[0].strip())  # 读取数据
+        if 'OSPF-5-ADJCHG' in str(data):
+            ospf_info = re.match(
+                r'.*OSPF-5-ADJCHG: Process (\d+), Nbr (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}) on (\w+\d+) from (\w+) to (\w+), .*',
+                str(data)).groups()
+            print(f'OSPF Porcess {ospf_info[0]} Neighbor {ospf_info[1]} status {ospf_info[4]}')
         print(data)
         syslog_info_dict = {'device_ip': self.client_address[0]}
         try:
@@ -120,7 +119,7 @@ class SyslogUDPHandler(socketserver.BaseRequestHandler):
 if __name__ == "__main__":
     # 使用Linux解释器 & WIN解释器
     global gl_dbname
-    gl_dbname = 'syslog.sqlite'
+    gl_dbname = 'syslog_homework.sqlite'
     if os.path.exists(gl_dbname):
         os.remove(gl_dbname)
     # 连接数据库
@@ -129,7 +128,7 @@ if __name__ == "__main__":
     # 创建数据库
 
     cursor.execute("create table syslogdb(id INTEGER PRIMARY KEY AUTOINCREMENT,\
-                                         time timestamp (64), \
+                                         time varchar(64), \
                                          device_ip varchar(32),\
                                          facility int,\
                                          facility_name varchar(32),\
@@ -145,7 +144,6 @@ if __name__ == "__main__":
         HOST, PORT = "0.0.0.0", 514  # 本地地址与端口
         server = socketserver.UDPServer((HOST, PORT), SyslogUDPHandler)  # 绑定本地地址，端口和syslog处理方法
         print("Syslog 服务已启用, 写入日志到数据库!!!")
-        snmp_trap_receiver("ens33")
         server.serve_forever(poll_interval=0.5)  # 运行服务器，和轮询间隔
 
     except (IOError, SystemExit):
@@ -154,3 +152,4 @@ if __name__ == "__main__":
         print("Crtl+C Pressed. Shutting down.")
     finally:
         conn.commit()
+
